@@ -9,7 +9,7 @@ import (
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/joho/godotenv" // Import package godotenv
+	"github.com/joho/godotenv"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
 	"google.golang.org/api/sheets/v4"
@@ -26,15 +26,19 @@ var spreadsheetPLN string
 var spreadsheetPLTS string
 var spreadsheetGenset125 string
 var spreadsheetGenset400 string
-var googleServiceAccountKeyPath string // Variabel untuk path kunci JSON
+var googleServiceAccountKeyPath string
+
+// --- NEW: Tambahkan variabel untuk link masing-masing spreadsheet ---
+var linkSpreadsheetPLN string
+var linkSpreadsheetPLTS string
+var linkSpreadsheetGenset125 string
+var linkSpreadsheetGenset400 string
 
 func init() {
-	// Muat file .env saat aplikasi dimulai
 	if err := godotenv.Load(); err != nil {
 		log.Fatalf("Error loading .env file: %v", err)
 	}
 
-	// Ambil nilai dari environment variables
 	BotToken = os.Getenv("BOT_TOKEN")
 	if BotToken == "" {
 		log.Fatal("BOT_TOKEN environment variable not set")
@@ -64,10 +68,27 @@ func init() {
 	if googleServiceAccountKeyPath == "" {
 		log.Fatal("GOOGLE_SERVICE_ACCOUNT_KEY_PATH environment variable not set")
 	}
+
+	// --- NEW: Inisialisasi link spreadsheet dari environment ---
+	linkSpreadsheetPLN = os.Getenv("LINK_SPREADSHEET_PLN")
+	if linkSpreadsheetPLN == "" {
+		log.Fatal("LINK_SPREADSHEET_PLN environment variable not set")
+	}
+	linkSpreadsheetPLTS = os.Getenv("LINK_SPREADSHEET_PLTS")
+	if linkSpreadsheetPLTS == "" {
+		log.Fatal("LINK_SPREADSHEET_PLTS environment variable not set")
+	}
+	linkSpreadsheetGenset125 = os.Getenv("LINK_SPREADSHEET_GENSET_125")
+	if linkSpreadsheetGenset125 == "" {
+		log.Fatal("LINK_SPREADSHEET_GENSET_125 environment variable not set")
+	}
+	linkSpreadsheetGenset400 = os.Getenv("LINK_SPREADSHEET_GENSET_400")
+	if linkSpreadsheetGenset400 == "" {
+		log.Fatal("LINK_SPREADSHEET_GENSET_400 environment variable not set")
+	}
 }
 
 func initGoogleSheet() {
-	// Gunakan variabel dari environment untuk membaca kredensial
 	b, err := os.ReadFile(googleServiceAccountKeyPath)
 	if err != nil {
 		log.Fatalf("Gagal membaca kredensial dari %s: %v", googleServiceAccountKeyPath, err)
@@ -85,8 +106,6 @@ func initGoogleSheet() {
 	}
 }
 
-// --- PERUBAHAN 1: Fungsi ini sekarang mengembalikan error ---
-// Ini memungkinkan kita untuk tahu apakah penulisan ke sheet berhasil atau tidak.
 func appendToSheet(spreadsheetID string, data []interface{}) error {
 	vr := &sheets.ValueRange{
 		Values: [][]interface{}{data},
@@ -94,21 +113,15 @@ func appendToSheet(spreadsheetID string, data []interface{}) error {
 	_, err := srv.Spreadsheets.Values.Append(spreadsheetID, "Sheet1!A1", vr).ValueInputOption("RAW").Do()
 	if err != nil {
 		log.Printf("Gagal menulis ke Google Sheet: %v", err)
-		return err // Kembalikan error jika gagal
+		return err
 	}
-	return nil // Kembalikan nil (tidak ada error) jika berhasil
+	return nil
 }
 
 func main() {
-	// Variabel BotToken sudah diisi di fungsi init()
-	// Jadi tidak perlu pengecekan di sini lagi
-	// if botToken == "" {
-	// 	log.Fatal("BOT_TOKEN tidak ditemukan")
-	// }
-
 	initGoogleSheet()
 
-	bot, err := tgbotapi.NewBotAPI(BotToken) // Gunakan variabel global BotToken
+	bot, err := tgbotapi.NewBotAPI(BotToken)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -137,10 +150,11 @@ func main() {
 			if strings.HasPrefix(text, "/start") {
 				msgText := "⚡️ *Mulai Pengecekan Catu Daya* ⚡️\n\n" +
 					"Silakan pilih sumber catu daya yang akan diperiksa:\n\n" +
-					"1. 🏢  PLN\n" +
-					"2. ☀️  PLTS\n" +
-					"3. ⛽️  Genset 125 kVA\n" +
-					"4. ⛽️  Genset 400 kVA\n\n" +
+					"1. 🏢  PLN\n" +
+					"2. ☀️  PLTS\n" +
+					"3. ⛽️  Genset 125 kVA\n" +
+					"4. ⛽️  Genset 400 kVA\n" +
+					"5. 📖  Lihat Rekap Report\n\n" +
 					"_Ketik angka pilihan Anda (contoh: 2)_"
 
 				msg := tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
@@ -154,18 +168,87 @@ func main() {
 			switch text {
 			case "1":
 				userData[userID]["alat"] = "PLN"
+				userState[userID] = "VOLT"
+				bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "💡 Masukkan data voltase (Volt):"))
 			case "2":
 				userData[userID]["alat"] = "PLTS"
+				userState[userID] = "VOLT"
+				bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "💡 Masukkan data voltase (Volt):"))
 			case "3":
 				userData[userID]["alat"] = "Genset 125 kVA"
+				userState[userID] = "VOLT"
+				bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "💡 Masukkan data voltase (Volt):"))
 			case "4":
 				userData[userID]["alat"] = "Genset 400 kVA"
+				userState[userID] = "VOLT"
+				bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "💡 Masukkan data voltase (Volt):"))
+			case "5":
+				// --- NEW: Pilihan untuk melihat rekap report ---
+				msgText := "Pilih rekap report yang ingin Anda lihat:\n\n" +
+					"1. 🏢  Rekap PLN\n" +
+					"2. ☀️  Rekap PLTS\n" +
+					"3. ⛽️  Rekap Genset 125 kVA\n" +
+					"4. ⛽️  Rekap Genset 400 kVA\n\n" +
+					"_Ketik angka pilihan Anda (contoh: 1)_"
+
+				msg := tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
+				bot.Send(msg)
+				userState[userID] = "VIEW_REPORT_CHOICE" // Set state baru
 			default:
-				bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Pilihan tidak valid. Ketik 1–4."))
+				bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Pilihan tidak valid. Ketik 1–5."))
 				continue
 			}
-			userState[userID] = "VOLT"
-			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "💡 Masukkan data voltase (Volt):"))
+
+		// --- NEW: State untuk menangani pilihan rekap report ---
+		case "VIEW_REPORT_CHOICE":
+			var reportLink string
+			var reportName string
+			switch text {
+			case "1":
+				reportLink = linkSpreadsheetPLN
+				reportName = "Rekap PLN"
+			case "2":
+				reportLink = linkSpreadsheetPLTS
+				reportName = "Rekap PLTS"
+			case "3":
+				reportLink = linkSpreadsheetGenset125
+				reportName = "Rekap Genset 125 kVA"
+			case "4":
+				reportLink = linkSpreadsheetGenset400
+				reportName = "Rekap Genset 400 kVA"
+			default:
+				bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Pilihan tidak valid. Ketik 1–4 untuk melihat rekap report."))
+				continue
+			}
+
+			userState[userID] = "" // Reset state setelah memberikan link
+
+			linkMessage := fmt.Sprintf("Anda bisa melihat %s di sini:", reportName)
+
+			// Buat inline keyboard dengan tombol URL
+			keyboard := tgbotapi.NewInlineKeyboardMarkup(
+				tgbotapi.NewInlineKeyboardRow(
+					tgbotapi.NewInlineKeyboardButtonURL("Buka Spreadsheet", reportLink),
+				),
+			)
+
+			msg := tgbotapi.NewMessage(update.Message.Chat.ID, linkMessage)
+			msg.ReplyMarkup = keyboard // Lampirkan keyboard
+			bot.Send(msg)
+
+			// Opsional: Kirim ulang menu utama setelah memberikan link
+			msgText := "⚡️ *Mulai Pengecekan Catu Daya* ⚡️\n\n" +
+				"Silakan pilih sumber catu daya yang akan diperiksa:\n\n" +
+				"1. 🏢  PLN\n" +
+				"2. ☀️  PLTS\n" +
+				"3. ⛽️  Genset 125 kVA\n" +
+				"4. ⛽️  Genset 400 kVA\n" +
+				"5. 📖  Lihat Rekap Report\n\n" +
+				"_Ketik angka pilihan Anda (contoh: 2)_"
+
+			msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
+			msg.ParseMode = "Markdown"
+			bot.Send(msg)
 
 		case "VOLT":
 			userData[userID]["volt"] = text
@@ -190,7 +273,6 @@ func main() {
 			}
 			userState[userID] = "" // Reset state pengguna
 
-			// Kirim rekap data ke pengguna
 			data := userData[userID]
 			hasil := fmt.Sprintf(
 				"🧾 *Rekap Data Pengecekan*\n\n"+
@@ -202,12 +284,10 @@ func main() {
 					"Mohon tunggu, sedang menyimpan data...",
 				data["alat"], data["volt"], data["arus"], data["jam"], data["kondisi"],
 			)
-			// Kirim rekap dengan format Markdown
 			recapMsg := tgbotapi.NewMessage(update.Message.Chat.ID, hasil)
 			recapMsg.ParseMode = "Markdown"
 			bot.Send(recapMsg)
 
-			// Tentukan spreadsheet ID berdasarkan alat
 			var targetSpreadsheet string
 			switch data["alat"] {
 			case "PLN":
@@ -220,21 +300,16 @@ func main() {
 				targetSpreadsheet = spreadsheetGenset400
 			}
 
-			// Simpan ke Google Sheet yang sesuai
 			timestamp := time.Now().Format("2006-01-02 15:04:05")
 			nama := update.Message.From.FirstName
 			err := appendToSheet(targetSpreadsheet, []interface{}{timestamp, nama, data["alat"], data["volt"], data["arus"], data["jam"], data["kondisi"]})
 
-			// Tambahkan alert berdasarkan hasil penyimpanan
 			var alertMsg tgbotapi.MessageConfig
 			if err != nil {
-				// Buat pesan error jika gagal
 				alertMsg = tgbotapi.NewMessage(update.Message.Chat.ID, "❌ Gagal menyimpan data ke spreadsheet. Silakan hubungi admin.")
 			} else {
-				// Buat pesan sukses jika berhasil
 				alertMsg = tgbotapi.NewMessage(update.Message.Chat.ID, "✅ Data berhasil disimpan ke Database!")
 			}
-			// Kirim pesan notifikasi
 			bot.Send(alertMsg)
 		}
 	}
