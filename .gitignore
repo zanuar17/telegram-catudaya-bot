@@ -1,0 +1,16 @@
+# File konfigurasi dan kredensial sensitif
+.env
+*.json       # Mengabaikan semua file JSON (penting untuk service account key Google)
+secrets/     # Jika Anda punya folder khusus untuk rahasia
+
+# Direktori dependensi
+vendor/      # Direktori Go module dependencies
+node_modules/ # Jika Anda juga menggunakan Node.js di proyek ini
+
+# File log
+*.log
+
+# File kompilasi (Go)
+*.exe        # Untuk aplikasi yang dikompilasi di Windows
+*.bin        # Nama umum untuk binary
+temp/        # Jika ada folder temporary
